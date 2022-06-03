@@ -1,0 +1,10 @@
+deb http://mirrors.aliyun.com/ubuntu jammy main restricted
+deb http://mirrors.aliyun.com/ubuntu jammy-updates main restricted
+deb http://mirrors.aliyun.com/ubuntu jammy universe
+deb http://mirrors.aliyun.com/ubuntu jammy-updates universe
+deb http://mirrors.aliyun.com/ubuntu jammy multiverse
+deb http://mirrors.aliyun.com/ubuntu jammy-updates multiverse
+deb http://mirrors.aliyun.com/ubuntu jammy-backports main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu jammy-security main restricted
+deb http://mirrors.aliyun.com/ubuntu jammy-security universe
+deb http://mirrors.aliyun.com/ubuntu jammy-security multiverse
