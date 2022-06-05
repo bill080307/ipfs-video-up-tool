@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import ffmpeg
 import ipfshttpclient
@@ -18,7 +19,6 @@ def read_config():
     config['mode'] = os.getenv("UP_mode", "file")  # file/m3u8
     config['up_mode'] = os.getenv("UP_up_mode", "ipfs")  # ipfs/ipfsFile/web3/fileCoin
     config['encode'] = os.getenv("UP_encode", False)  # True/False
-    config['m3u8'] = os.getenv("UP_m3u8", False)  # True/False
     config['ipfs_api'] = os.getenv("UP_ipfs_api")
 
 
@@ -48,11 +48,23 @@ def check():
 
 def encode():
     infile = config['input_file']
-    config["en_file"] = os.path.join(config['output_dir'], os.path.basename(config['input_file']))
+    basename = os.path.splitext(os.path.basename(config['input_file']))[0] + ".mp4"
+    config["en_file"] = os.path.join(config['output_dir'], basename)
     if os.path.isfile(config["en_file"]):
         os.remove(config["en_file"])
+    info = config['videoinfo']
+
+    vcodec = "copy"
+    acodec = "copy"
+    for stream in info['streams']:
+        if stream['codec_type'] == "audio":
+            if not stream['codec_name'] == 'aac':
+                acodec = "aac"
+        elif stream['codec_type'] == "video":
+            if not stream['codec_name'] == 'h264':
+                vcodec = "libx264"
     stream = ffmpeg.input(infile)
-    stream = ffmpeg.output(stream, config["en_file"], vcodec='libx264', acodec='aac',
+    stream = ffmpeg.output(stream, config["en_file"], vcodec=vcodec, acodec=acodec,
                            f='mp4', )
     stream.run()
     config['videoinfo'] = getvideofileinfo(config['en_file'])
@@ -75,12 +87,26 @@ def check_encode():
 
 
 def out_m3u8():
-    # TODO m3u8 切片
-    pass
+    HLS_TIME = 30
+    infile = config['en_file'] if config['encode'] else config['input_file']
+    basename = os.path.splitext(os.path.basename(infile))[0]
+    tempDir = os.path.join(config['output_dir'], basename)
+    os.mkdir(tempDir)
+    os.chdir(tempDir)
+    cmd = u"ffmpeg -i %s -vcodec copy -acodec copy -f segment -segment_time %s -hls_playlist_type vod -segment_list %s.m3u8 %s_%%03d.ts" \
+          % (infile, HLS_TIME, 'index', 'video')
+    print(cmd)
+    output = os.popen(cmd)
+    print(output.read())
+    config['m3u8_dir'] = tempDir
 
 
 def up_ipfs(Filestore=False):
     api = ipfshttpclient.connect(config['ipfs_api'], timeout=3600)
+    ipfs_conf = api.config.get()
+    if Filestore and not ipfs_conf['Experimental']['FilestoreEnabled']:
+        print('ipfs node Filestore is disable')
+        exit(1)
     if config['mode'] == 'file':
         infile = config['en_file'] if config['encode'] else config['input_file']
         file_stats = os.stat(infile)
@@ -91,8 +117,24 @@ def up_ipfs(Filestore=False):
             h = api.add(infile, nocopy=Filestore)
         return h['Hash']
     elif config['mode'] == 'm3u8':
-        # TODO 将m3u8 文件上传到ipfs
-        pass
+        m3u8_file = os.path.join(config['m3u8_dir'], 'index.m3u8')
+        with open(m3u8_file, "r") as f:
+            m3u8 = f.read()
+        m3u8_new = m3u8
+        m3u8_ts = re.findall(r'#EXTINF:.*\n(video_.*\.ts)', m3u8)
+        for ts in m3u8_ts:
+            infile = os.path.join(config['m3u8_dir'], ts)
+            file_stats = os.stat(infile)
+            fsize = file_stats.st_size
+            if fsize > 1024 * 1024 * 5:
+                h = api.add(infile, chunker='size-1048576', nocopy=Filestore)
+            else:
+                h = api.add(infile, nocopy=Filestore)
+            m3u8_new = m3u8_new.replace(ts, "/ipfs/" + h['Hash'])
+        with open(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), "w") as f:
+            f.write(m3u8_new)
+        h = api.add(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), nocopy=Filestore)
+        return h['Hash']
 
 
 if __name__ == '__main__':
@@ -102,7 +144,7 @@ if __name__ == '__main__':
         encode()
     else:
         check_encode()
-    if config['mode']:
+    if config['mode'] == 'm3u8':
         out_m3u8()
 
     if config['up_mode'] == 'ipfs':
