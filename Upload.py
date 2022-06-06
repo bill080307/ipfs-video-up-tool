@@ -149,12 +149,13 @@ def up_web3():
         data = MultipartEncoder(fields={'file': (name, open(file, 'rb'), 'application/octet-stream')})
         headers = {
             "accept": "application/json",
-            'X-Name': parse.quote('abc.bin'),
+            'X-Name': parse.quote(name),
             "Content-Type": data.content_type,
             "Authorization": "Bearer " + config['web3_token']
         }
         response = requests.request("POST", url, data=data, headers=headers)
         return json.loads(response.text)
+
     m3u8_file = os.path.join(config['m3u8_dir'], 'index.m3u8')
     with open(m3u8_file, "r") as f:
         m3u8 = f.read()
