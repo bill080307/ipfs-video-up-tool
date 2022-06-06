@@ -2,6 +2,10 @@ import json
 import os
 import re
 import sys
+from urllib import parse
+
+import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 import ffmpeg
 import ipfshttpclient
 
@@ -20,6 +24,7 @@ def read_config():
     config['up_mode'] = os.getenv("UP_up_mode", "ipfs")  # ipfs/ipfsFile/web3/fileCoin
     config['encode'] = os.getenv("UP_encode", False)  # True/False
     config['ipfs_api'] = os.getenv("UP_ipfs_api")
+    config['web3_token'] = os.getenv("UP_web3_token")
 
 
 def getvideofileinfo(filepath):
@@ -112,9 +117,9 @@ def up_ipfs(Filestore=False):
         file_stats = os.stat(infile)
         fsize = file_stats.st_size
         if fsize > 1024 * 1024 * 5:
-            h = api.add(infile, chunker='size-1048576', nocopy=Filestore)
+            h = api.add(infile, chunker='size-1048576', nocopy=Filestore, cid_version=1)
         else:
-            h = api.add(infile, nocopy=Filestore)
+            h = api.add(infile, nocopy=Filestore, cid_version=1)
         return h['Hash']
     elif config['mode'] == 'm3u8':
         m3u8_file = os.path.join(config['m3u8_dir'], 'index.m3u8')
@@ -127,14 +132,42 @@ def up_ipfs(Filestore=False):
             file_stats = os.stat(infile)
             fsize = file_stats.st_size
             if fsize > 1024 * 1024 * 5:
-                h = api.add(infile, chunker='size-1048576', nocopy=Filestore)
+                h = api.add(infile, chunker='size-1048576', nocopy=Filestore, cid_version=1)
             else:
-                h = api.add(infile, nocopy=Filestore)
+                h = api.add(infile, nocopy=Filestore, cid_version=1)
             m3u8_new = m3u8_new.replace(ts, "/ipfs/" + h['Hash'])
         with open(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), "w") as f:
             f.write(m3u8_new)
-        h = api.add(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), nocopy=Filestore)
+        h = api.add(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), nocopy=Filestore, cid_version=1)
         return h['Hash']
+
+
+def up_web3():
+    def up(file):
+        url = 'https://api.web3.storage/upload'
+        name = os.path.basename(file)
+        data = MultipartEncoder(fields={'file': (name, open(file, 'rb'), 'application/octet-stream')})
+        headers = {
+            "accept": "application/json",
+            'X-Name': parse.quote('abc.bin'),
+            "Content-Type": data.content_type,
+            "Authorization": "Bearer " + config['web3_token']
+        }
+        response = requests.request("POST", url, data=data, headers=headers)
+        return json.loads(response.text)
+    m3u8_file = os.path.join(config['m3u8_dir'], 'index.m3u8')
+    with open(m3u8_file, "r") as f:
+        m3u8 = f.read()
+    m3u8_new = m3u8
+    m3u8_ts = re.findall(r'#EXTINF:.*\n(video_.*\.ts)', m3u8)
+    for ts in m3u8_ts:
+        infile = os.path.join(config['m3u8_dir'], ts)
+        h = up(infile)
+        m3u8_new = m3u8_new.replace(ts, "/ipfs/" + h['cid'])
+    with open(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), "w") as f:
+        f.write(m3u8_new)
+    h = up(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'))
+    return h['cid']
 
 
 if __name__ == '__main__':
@@ -151,6 +184,8 @@ if __name__ == '__main__':
         f_hash = up_ipfs()
     elif config['up_mode'] == 'ipfsFile':
         f_hash = up_ipfs(Filestore=True)
+    elif config['up_mode'] == 'web3':
+        f_hash = up_web3()
 
     print(f_hash)
     print("IPFS upload tool.")
