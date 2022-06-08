@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import sys
 from urllib import parse
 
@@ -25,6 +26,7 @@ def read_config():
     config['encode'] = os.getenv("UP_encode", False)  # True/False
     config['ipfs_api'] = os.getenv("UP_ipfs_api")
     config['web3_token'] = os.getenv("UP_web3_token")
+    config['cover'] = os.getenv("UP_cover")
 
 
 def getvideofileinfo(filepath):
@@ -33,7 +35,7 @@ def getvideofileinfo(filepath):
     os.chdir(path)
     output = os.popen(
         u'ffprobe -v quiet -print_format json -show_format -show_streams %s' % filename)
-    return json.loads(output.read())
+    return json.loads(output.read(), strict=False)
 
 
 def check():
@@ -120,7 +122,11 @@ def up_ipfs(Filestore=False):
             h = api.add(infile, chunker='size-1048576', nocopy=Filestore, cid_version=1)
         else:
             h = api.add(infile, nocopy=Filestore, cid_version=1)
-        return h['Hash']
+        file_hash = '/ipfs/' + h['Hash']
+        print('file: ' + file_hash)
+        if config['cover']:
+            h = api.add(config['cover'], nocopy=Filestore, cid_version=1)
+            config['cover_hash'] = '/ipfs/' + h['Hash']
     elif config['mode'] == 'm3u8':
         m3u8_file = os.path.join(config['m3u8_dir'], 'index.m3u8')
         with open(m3u8_file, "r") as f:
@@ -139,7 +145,42 @@ def up_ipfs(Filestore=False):
         with open(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), "w") as f:
             f.write(m3u8_new)
         h = api.add(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), nocopy=Filestore, cid_version=1)
-        return h['Hash']
+        file_hash = '/ipfs/' + h['Hash']
+        print('m3u8: ' + file_hash)
+    if config['cover']:
+        newpath = os.path.join(config['m3u8_dir'], 'cover.jpg')
+        shutil.copy(config['cover'], newpath)
+        h = api.add(newpath, nocopy=Filestore, cid_version=1)
+        config['cover_hash'] = '/ipfs/' + h['Hash']
+
+    out = {
+        'title': os.path.basename(config['input_file']),
+        'cover': config['cover_hash'] if config['cover'] else "",
+        'files': []
+    }
+    out['files'].append({
+        'title': os.path.basename(config['input_file']),
+        'size': int(config['videoinfo']['format']['size']),
+        'duration': int(float(config['videoinfo']['format']['duration'])),
+        'url': file_hash,
+        'mediainfo': config['videoinfo']
+    })
+    if config['mode'] == 'file':
+        json_file = os.path.join(config['output_dir'], 'files.json')
+        file = open(json_file, 'w')
+        json.dump(out, file, ensure_ascii=False)
+        file.close()
+        h = api.add(json_file, nocopy=False, cid_version=1)
+        json_hash = '/ipfs/' + h['Hash']
+    elif config['mode'] == 'm3u8':
+        json_file = os.path.join(config['m3u8_dir'], 'files.json')
+        file = open(json_file, 'w')
+        json.dump(out, file, ensure_ascii=False)
+        file.close()
+        h = api.add(json_file, nocopy=Filestore, cid_version=1)
+        json_hash = '/ipfs/' + h['Hash']
+    print('files.json: ' + json_hash)
+    return json_hash
 
 
 def up_web3():
@@ -168,7 +209,31 @@ def up_web3():
     with open(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), "w") as f:
         f.write(m3u8_new)
     h = up(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'))
-    return h['cid']
+    file_hash = '/ipfs/' + h['cid']
+    print('m3u8: ' + file_hash)
+    if config['cover']:
+        h = up(config['cover'])
+        config['cover_hash'] = '/ipfs/' + h['cid']
+    out = {
+        'title': os.path.basename(config['input_file']),
+        'cover': config['cover_hash'] if config['cover'] else "",
+        'files': []
+    }
+    out['files'].append({
+        'title': os.path.basename(config['input_file']),
+        'size': int(config['videoinfo']['format']['size']),
+        'duration': int(float(config['videoinfo']['format']['duration'])),
+        'url': file_hash,
+        'mediainfo': config['videoinfo']
+    })
+    json_file = os.path.join(config['m3u8_dir'], 'files.json')
+    file = open(json_file, 'w')
+    json.dump(out, file, ensure_ascii=False)
+    file.close()
+    h = up(json_file)
+    json_hash = '/ipfs/' + h['cid']
+    print('files.json: ' + json_hash)
+    return json_hash
 
 
 if __name__ == '__main__':
@@ -187,6 +252,3 @@ if __name__ == '__main__':
         f_hash = up_ipfs(Filestore=True)
     elif config['up_mode'] == 'web3':
         f_hash = up_web3()
-
-    print(f_hash)
-    print("IPFS upload tool.")
