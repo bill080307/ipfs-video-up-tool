@@ -147,11 +147,11 @@ def up_ipfs(Filestore=False):
         h = api.add(os.path.join(config['m3u8_dir'], 'index_ipfs.m3u8'), nocopy=Filestore, cid_version=1)
         file_hash = '/ipfs/' + h['Hash']
         print('m3u8: ' + file_hash)
-    if config['cover']:
-        newpath = os.path.join(config['m3u8_dir'], 'cover.jpg')
-        shutil.copy(config['cover'], newpath)
-        h = api.add(newpath, nocopy=Filestore, cid_version=1)
-        config['cover_hash'] = '/ipfs/' + h['Hash']
+        if config['cover']:
+            newpath = os.path.join(config['m3u8_dir'], 'cover.jpg')
+            shutil.copy(config['cover'], newpath)
+            h = api.add(newpath, nocopy=Filestore, cid_version=1)
+            config['cover_hash'] = '/ipfs/' + h['Hash']
 
     out = {
         'title': os.path.basename(config['input_file']),
@@ -163,6 +163,7 @@ def up_ipfs(Filestore=False):
         'size': int(config['videoinfo']['format']['size']),
         'duration': int(float(config['videoinfo']['format']['duration'])),
         'url': file_hash,
+        'type': "m3u8" if config['mode'] == 'm3u8' else "file",
         'mediainfo': config['videoinfo']
     })
     if config['mode'] == 'file':
@@ -224,6 +225,7 @@ def up_web3():
         'size': int(config['videoinfo']['format']['size']),
         'duration': int(float(config['videoinfo']['format']['duration'])),
         'url': file_hash,
+        'type': "m3u8" if config['mode'] == 'm3u8' else "file",
         'mediainfo': config['videoinfo']
     })
     json_file = os.path.join(config['m3u8_dir'], 'files.json')

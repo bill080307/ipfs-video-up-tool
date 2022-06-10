@@ -10,6 +10,7 @@ ipfs协议的视频辅助上传工具
 6. - [x] 支持上传到ipfs节点的Filestore方式,单文件形式
 7. - [x] 支持上传到ipfs节点的Filestore方式,m3u8形式
 8. - [x] 支持上传到web3.storage,支持m3u8形式
+9. - [x] 支持封面,输出组合成files.json,给 [player](https://github.com/bill080307/VideoShare/tree/master/player) 项目
 
 # 流程图
 ![FlowChart](img/FlowChart.png)
@@ -35,6 +36,7 @@ export UP_up_mode=ipfs                     # 存储方式，支持ipfs普通模�
 export UP_encode=False                     # 是否启用转码，为了更好的适配HTML5，开启转码将会转成h264/aac格式
 export UP_ipfs_api=/ip4/127.0.0.1/tcp/5001 # 传递ipfs的api地址，采用多地址格式(Multiaddr)
 export UP_web3_token=eyJhbG.....           # 使用web3作为存储时，web3帐号的token
+export UP_cover=cover.jpg
 
 python3 Update.py Example.mkv          #脚本第一个参数为输入的文件。
 python3 Update.py Example.mkv /output  #脚本第二个参数为输出文件夹。
@@ -48,7 +50,34 @@ docker run \
     -e UP_encode=False \
     -e UP_ipfs_api=/ip4/127.0.0.1/tcp/5001 \
     -e UP_web3_token=eyJhbG..... \
+    -e UP_cover=cover.jpg \
     -v /input_dir:/data \
-    -itd /data/Example.mkv
+    -itd ipfs-video-up-tool:v0.0.1 /data/Example.mkv
 ~~~
 
+## 示例
+使用file模式上传
+
+file: /ipfs/bafybeifww6po5qc6h3kq3xuf7uqckz4vrxbf3o6tedxngswsmxgxu25nbm  
+files.json: /ipfs/bafybeidxgsx57zyysfaras5u7zkksclwb4myfe35mp4mbsxqtkohcjgas4  
+
+使用m3u8模式上传
+
+m3u8: /ipfs/bafybeih3rqt54lz4wb5rbe5lmqc7gdow6y5zonhbaddv4mewggwrjr6gcu  
+files.json: /ipfs/bafybeifv6hasa7v24kojrhxg3o333lzithfchlsrzz3pwsne65qtkx5usi  
+
+添加files.json 到 [player项目](https://github.com/bill080307/VideoShare/tree/master/player)
+
+file模式播放器截图:
+
+![player-file-mode1](img/2022-06-10_23-18.png)
+
+![player-file-mode2](img/2022-06-10_23-20.png)
+
+m3u8模式播放器截图:
+
+![player-m3u8-mode1](img/2022-06-10_23-26.png)
+
+![player-m3u8-mode2](img/2022-06-10_23-27.png)
+
+![player-m3u8-mode3](img/2022-06-10_23-30.png)
