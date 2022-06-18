@@ -11,6 +11,7 @@ ipfs协议的视频辅助上传工具
 7. - [x] 支持上传到ipfs节点的Filestore方式,m3u8形式
 8. - [x] 支持上传到web3.storage,支持m3u8形式
 9. - [x] 支持封面,输出组合成files.json,给 [player](https://github.com/bill080307/VideoShare/tree/master/player) 项目
+10. - [ ] 支持files.json从url hash加载。
 
 # 流程图
 ![FlowChart](img/FlowChart.png)
@@ -70,14 +71,14 @@ files.json: /ipfs/bafybeifv6hasa7v24kojrhxg3o333lzithfchlsrzz3pwsne65qtkx5usi
 
 file模式播放器截图:
 
-![player-file-mode1](img/2022-06-10_23-18.png)
+![player-file-mode1](img/2022-06-10_23-18.jpg)
 
-![player-file-mode2](img/2022-06-10_23-20.png)
+![player-file-mode2](img/2022-06-10_23-20.jpg)
 
 m3u8模式播放器截图:
 
-![player-m3u8-mode1](img/2022-06-10_23-26.png)
+![player-m3u8-mode1](img/2022-06-10_23-26.jpg)
 
-![player-m3u8-mode2](img/2022-06-10_23-27.png)
+![player-m3u8-mode2](img/2022-06-10_23-27.jpg)
 
-![player-m3u8-mode3](img/2022-06-10_23-30.png)
+![player-m3u8-mode3](img/2022-06-10_23-30.jpg)
